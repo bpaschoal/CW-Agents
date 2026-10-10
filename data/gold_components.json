@@ -1,0 +1,140 @@
+{
+ "screens/s1_pre.png": [
+  {
+   "text": "Shipping address: Rua A, 100",
+   "bbox": [
+    40,
+    90,
+    400,
+    30
+   ]
+  },
+  {
+   "text": "Edit address",
+   "bbox": [
+    500,
+    85,
+    170,
+    40
+   ]
+  },
+  {
+   "text": "Pay now",
+   "bbox": [
+    40,
+    400,
+    140,
+    40
+   ]
+  }
+ ],
+ "screens/s1_post.png": [
+  {
+   "text": "Rua A, 100",
+   "bbox": [
+    40,
+    90,
+    420,
+    40
+   ]
+  },
+  {
+   "text": "Save",
+   "bbox": [
+    480,
+    90,
+    100,
+    40
+   ]
+  }
+ ],
+ "screens/s2_pre.png": [
+  {
+   "text": "Rua A, 100",
+   "bbox": [
+    40,
+    90,
+    420,
+    40
+   ]
+  },
+  {
+   "text": "Save",
+   "bbox": [
+    480,
+    90,
+    100,
+    40
+   ]
+  }
+ ],
+ "screens/s2_post.png": [
+  {
+   "text": "Shipping address: Rua A, 100",
+   "bbox": [
+    40,
+    90,
+    400,
+    30
+   ]
+  },
+  {
+   "text": "Pay now",
+   "bbox": [
+    40,
+    400,
+    140,
+    40
+   ]
+  }
+ ],
+ "screens/t2s1_pre.png": [
+  {
+   "text": "Shipping address: Rua A, 100",
+   "bbox": [
+    40,
+    90,
+    400,
+    30
+   ]
+  },
+  {
+   "text": "edit icon",
+   "bbox": [
+    500,
+    85,
+    36,
+    36
+   ]
+  },
+  {
+   "text": "Pay now",
+   "bbox": [
+    40,
+    400,
+    140,
+    40
+   ]
+  }
+ ],
+ "screens/t2s1_post.png": [
+  {
+   "text": "Rua A, 100",
+   "bbox": [
+    40,
+    90,
+    420,
+    40
+   ]
+  },
+  {
+   "text": "Save",
+   "bbox": [
+    480,
+    90,
+    100,
+    40
+   ]
+  }
+ ]
+}

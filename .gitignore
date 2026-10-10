@@ -1,0 +1,5 @@
+runs/
+results/
+.perception_cache/
+__pycache__/
+*.zip

@@ -1,0 +1,44 @@
+{
+ "tasks": [
+  {
+   "id": "T1_labelled",
+   "app": "demo_shop",
+   "goal": "Change the delivery address before completing checkout",
+   "persona": "A first-time visitor of the shop, with general familiarity with online shopping but no prior exposure to this site.",
+   "steps": [
+    {
+     "id": "1",
+     "action": "Click the 'Edit address' button next to the shipping address",
+     "target": "Edit address button",
+     "gesture": "click",
+     "pre": "screens/s1_pre.png",
+     "post": "screens/s1_post.png"
+    },
+    {
+     "id": "2",
+     "action": "Click the 'Save' button next to the address field",
+     "target": "Save button",
+     "gesture": "click",
+     "pre": "screens/s2_pre.png",
+     "post": "screens/s2_post.png"
+    }
+   ]
+  },
+  {
+   "id": "T2_icon",
+   "app": "demo_shop",
+   "goal": "Change the delivery address before completing checkout",
+   "persona": "A first-time visitor of the shop, with general familiarity with online shopping but no prior exposure to this site.",
+   "steps": [
+    {
+     "id": "1",
+     "action": "Click the pencil icon next to the shipping address",
+     "target": "pencil icon",
+     "gesture": "click",
+     "pre": "screens/t2s1_pre.png",
+     "post": "screens/t2s1_post.png"
+    }
+   ]
+  }
+ ]
+}

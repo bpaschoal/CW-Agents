@@ -1,0 +1,13 @@
+task_id,step_id,q,answer
+T1_labelled,1,CW1,yes
+T1_labelled,1,CW2,yes
+T1_labelled,1,CW3,yes
+T1_labelled,1,CW4,yes
+T1_labelled,2,CW1,yes
+T1_labelled,2,CW2,yes
+T1_labelled,2,CW3,yes
+T1_labelled,2,CW4,yes
+T2_icon,1,CW1,yes
+T2_icon,1,CW2,no
+T2_icon,1,CW3,no
+T2_icon,1,CW4,yes
