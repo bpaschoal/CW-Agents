@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-"""Gera dados de demonstração (telas sintéticas + tasks.json + gabaritos) para testar o pipeline sem API."""
 import json
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont

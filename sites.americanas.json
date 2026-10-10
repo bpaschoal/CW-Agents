@@ -1,0 +1,59 @@
+{
+  "allowed_domains": ["americanas.com.br"],
+  "viewport": [1280, 800],
+  "locale": "pt-BR",
+  "tasks": [
+    {
+      "id": "am_busca", "app": "americanas.com.br", "url": "https://www.americanas.com.br/",
+      "goal": "Search for a product (wired headphones) using the site's search",
+      "persona": "A first-time visitor of americanas.com.br, a Brazilian Portuguese speaker with general familiarity with online shopping but no prior exposure to this site's interface.",
+      "dismiss": ["button:has-text(\"aceitar\")", "button:has-text(\"Aceitar\")", "button:has-text(\"entendi\")"],
+      "steps": [
+        {"id": "1", "action": "Click the search field in the page header", "target": "search field", "gesture": "click",
+         "selector": "input[placeholder*=\"busque\" i], input[type=\"search\"], [data-fs-search-input-field]"},
+        {"id": "2", "action": "Type the product name into the search field", "target": "search field", "gesture": "type",
+         "selector": "input[placeholder*=\"busque\" i], input[type=\"search\"], [data-fs-search-input-field]", "value": "fone de ouvido com fio", "wait_ms": 1200},
+        {"id": "3", "action": "Press the Enter key to submit the search", "target": "search field", "gesture": "press",
+         "selector": "input[placeholder*=\"busque\" i], input[type=\"search\"], [data-fs-search-input-field]", "value": "Enter", "wait_ms": 3000}
+      ]
+    },
+    {
+      "id": "am_cep", "app": "americanas.com.br", "url": "https://www.americanas.com.br/",
+      "goal": "Inform a postal code (CEP) to see delivery offers for a region",
+      "persona": "A first-time visitor of americanas.com.br, a Brazilian Portuguese speaker with general familiarity with online shopping but no prior exposure to this site's interface.",
+      "dismiss": ["button:has-text(\"aceitar\")", "button:has-text(\"Aceitar\")", "button:has-text(\"entendi\")"],
+      "steps": [
+        {"id": "1", "action": "Click the postal-code control in the page header", "target": "postal code control", "gesture": "click",
+         "selector": "text=/informe seu CEP/i"},
+        {"id": "2", "action": "Type the postal code into the postal-code field", "target": "postal code field", "gesture": "type",
+         "selector": "input[placeholder*=\"CEP\" i], input[name*=\"cep\" i], input[inputmode=\"numeric\"]", "value": "01001-000"},
+        {"id": "3", "action": "Click the confirmation button next to the postal-code field", "target": "OK button", "gesture": "click",
+         "selector": "button:text-is(\"OK\")", "wait_ms": 2500}
+      ]
+    },
+    {
+      "id": "am_departamentos", "app": "americanas.com.br", "url": "https://www.americanas.com.br/",
+      "goal": "Browse to the smartphones category through the departments menu",
+      "persona": "A first-time visitor of americanas.com.br, a Brazilian Portuguese speaker with general familiarity with online shopping but no prior exposure to this site's interface.",
+      "dismiss": ["button:has-text(\"aceitar\")", "button:has-text(\"Aceitar\")", "button:has-text(\"entendi\")"],
+      "steps": [
+        {"id": "1", "action": "Click the departments menu button in the page header", "target": "departments menu", "gesture": "click",
+         "selector": "text=/todos os departamentos/i"},
+        {"id": "2", "action": "Click the smartphones category link in the departments menu", "target": "smartphones category link", "gesture": "click",
+         "selector": "a[href*=\"celulares-e-smartphones\"]", "wait_ms": 3000}
+      ]
+    },
+    {
+      "id": "am_produto", "app": "americanas.com.br", "url": "https://www.americanas.com.br/celulares-e-smartphones",
+      "goal": "Open a product from a category listing and add it to the cart",
+      "persona": "A first-time visitor of americanas.com.br, a Brazilian Portuguese speaker with general familiarity with online shopping but no prior exposure to this site's interface.",
+      "dismiss": ["button:has-text(\"aceitar\")", "button:has-text(\"Aceitar\")", "button:has-text(\"entendi\")"],
+      "steps": [
+        {"id": "1", "action": "Click the first product card in the listing", "target": "first product card", "gesture": "click",
+         "selector": "a[href*=\"/produto/\"]", "wait_ms": 3000},
+        {"id": "2", "action": "Click the button that adds the product to the cart", "target": "buy button", "gesture": "click",
+         "selector": "button:has-text(\"comprar\"), button:has-text(\"adicionar\")", "wait_ms": 3000}
+      ]
+    }
+  ]
+}

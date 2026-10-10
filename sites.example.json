@@ -1,0 +1,18 @@
+{
+  "allowed_domains": ["127.0.0.1", "localhost"],
+  "viewport": [1280, 800],
+  "tasks": [
+    {"id": "demo_icon", "app": "demo_shop", "url": "http://127.0.0.1:8765/index.html",
+     "goal": "Change the delivery address before completing checkout",
+     "persona": "A first-time visitor of the shop, with general familiarity with online shopping but no prior exposure to this site.",
+     "dismiss": [],
+     "steps": [
+       {"id": "1", "action": "Click the pencil icon next to the shipping address", "target": "pencil icon", "gesture": "click", "selector": "#edit-icon"},
+       {"id": "2", "action": "Type the new address into the address field", "target": "address field", "gesture": "type", "selector": "#addr", "value": "Rua B, 200"},
+       {"id": "3", "action": "Click the 'Save' button next to the address field", "target": "Save button", "gesture": "click", "selector": "text=Save"}
+     ]},
+    {"id": "demo_bad_selector", "app": "demo_shop", "url": "http://127.0.0.1:8765/index.html",
+     "goal": "Teste de falha: seletor inexistente", "steps": [
+       {"id": "1", "action": "Click a button that does not exist", "gesture": "click", "selector": "#nao-existe"}]}
+  ]
+}

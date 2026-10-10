@@ -1,19 +1,9 @@
-#!/usr/bin/env python3
-"""CW-Agents: pipeline mínimo da fase de Análise do Percurso Cognitivo.
-
-Orchestrator -> Perception (DET_OCR | VLM | COMBINED) -> CW1..CW4 (independentes) -> Report.
-Cada execução gera um JSONL de logs (Seção 3.3 do artigo).
-
-Uso:
-  python cw_agents.py --tasks data/tasks.json --conditions DET_OCR VLM COMBINED --repeats 3 --out runs
-  python cw_agents.py --mock ...      # sem API: valida o pipeline (resultados sem significado)
-"""
 import argparse, base64, hashlib, json, os, random, re, sys, threading, time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 CONDITIONS = ["DET_OCR", "VLM", "COMBINED"]
-DEFAULT_MODEL = os.environ.get("CW_MODEL", "claude-sonnet-5-5")
+DEFAULT_MODEL = os.environ.get("CW_MODEL", "claude-sonnet-5-5")  # só vale para provider=anthropic
 
 QUESTIONS = {
     "CW1": "Will the user try to achieve the right effect? (goal formation: given the task and the current screen, would the persona form the intention that this Action serves?)",
@@ -24,31 +14,67 @@ QUESTIONS = {
 
 # ----------------------------------------------------------------------------- LLM
 class LLM:
-    def __init__(self, model, mock=False, temperature=0.0):
-        self.model, self.mock, self.temperature = model, mock, temperature
+    def __init__(self, model, mock=False, temperature=0.0, provider="anthropic"):
+        self.model, self.mock, self.temperature, self.provider = model, mock, temperature, provider
         self.client = None
-        if not mock:
+        if provider == "ollama":
+            h = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+            self.host = (h if h.startswith("http") else "http://" + h).rstrip("/")
+        elif not mock:
             import anthropic
             self.client = anthropic.Anthropic()  # usa ANTHROPIC_API_KEY
 
-    def ask(self, system, text, images=(), max_tokens=1500):
+    @staticmethod
+    def _b64(p): return base64.standard_b64encode(Path(p).read_bytes()).decode()
+
+    def ask(self, system, text, images=(), max_tokens=1500, temperature=None):
+        t = self.temperature if temperature is None else temperature
         if self.mock:
             return self._mock(text)
+        if self.provider == "ollama":
+            return self._ollama(system, text, images, max_tokens, t)
         content = []
         for p in images:
-            data = base64.standard_b64encode(Path(p).read_bytes()).decode()
             mt = "image/png" if str(p).lower().endswith("png") else "image/jpeg"
-            content.append({"type": "image", "source": {"type": "base64", "media_type": mt, "data": data}})
+            content.append({"type": "image", "source": {"type": "base64", "media_type": mt, "data": self._b64(p)}})
         content.append({"type": "text", "text": text})
         for attempt in range(4):
             try:
-                r = self.client.messages.create(model=self.model, max_tokens=max_tokens,
-                        temperature=self.temperature, system=system,
+                r = self.client.messages.create(model=self.model, max_tokens=max_tokens, temperature=t, system=system,
                         messages=[{"role": "user", "content": content}])
                 return "".join(b.text for b in r.content if b.type == "text")
-            except Exception as e:
+            except Exception:
                 if attempt == 3: raise
                 time.sleep(2 ** attempt)
+
+    def _ollama(self, system, text, images, max_tokens, t):
+        import urllib.request, urllib.error
+        body = {"model": self.model, "stream": False, "format": "json", "keep_alive": "30m", "think": False,
+                "options": {"temperature": t, "num_ctx": int(os.environ.get("CW_NUM_CTX", 8192)), "num_predict": max(max_tokens, 1500)},
+                "messages": [{"role": "system", "content": system},
+                             {"role": "user", "content": text, "images": [self._b64(p) for p in images]}]}
+        for attempt in range(3):
+            req = urllib.request.Request(self.host + "/api/chat", json.dumps(body).encode(), {"Content-Type": "application/json"})
+            try:
+                with urllib.request.urlopen(req, timeout=1800) as r:
+                    return json.loads(r.read())["message"]["content"]
+            except urllib.error.HTTPError as e:
+                msg = e.read().decode(errors="ignore")
+                if e.code == 400 and "think" in msg.lower() and "think" in body:
+                    body.pop("think"); continue          # modelo sem suporte a 'think'
+                raise RuntimeError(f"Ollama HTTP {e.code}: {msg[:300]}")
+            except urllib.error.URLError as e:
+                if attempt == 2: raise RuntimeError(f"Não consegui falar com o Ollama em {self.host}: {e}. Ele está rodando? (ollama serve)")
+                time.sleep(3)
+
+    def ask_json(self, system, text, images=(), max_tokens=1500, tries=3):
+        """Pede JSON; modelos locais pequenos às vezes erram o formato, então tenta de novo com temperatura > 0."""
+        last = None
+        for i in range(tries):
+            out = self.ask(system, text, images, max_tokens, temperature=None if i == 0 else 0.3)
+            try: return parse_json(out)
+            except Exception as e: last = e
+        raise ValueError(f"resposta sem JSON válido após {tries} tentativas: {last}")
 
     @staticmethod
     def _mock(text):
@@ -119,12 +145,17 @@ def vlm_components(llm, img_path, persona, hint=None):
               "For each give a natural-language description (include visible text and apparent function) and bbox=[x,y,w,h] in pixels (best effort).\n"
               f"User persona (affects what is understandable): {persona}\n"
               'Format: {"components":[{"description":"...","bbox":[x,y,w,h]}]}' + extra)
-    comps = parse_json(llm.ask(VLM_SYS, prompt, [img_path]))["components"]
-    for c in comps: c.setdefault("source", "vlm")
+    raw = llm.ask_json(VLM_SYS, prompt, [img_path], max_tokens=3000).get("components", [])
+    comps = []
+    for c in raw if isinstance(raw, list) else []:
+        if not isinstance(c, dict) or not str(c.get("description", "")).strip(): continue
+        b = c.get("bbox")
+        ok = isinstance(b, list) and len(b) == 4 and all(isinstance(v, (int, float)) for v in b)
+        comps.append({"description": str(c["description"]), "bbox": [int(v) for v in b] if ok else None, "source": "vlm"})
     return comps
 
 def perceive(llm, cond, img_path, persona, yolo_weights, cache_dir, use_cache=True):
-    key = hashlib.md5(cond.encode() + Path(img_path).read_bytes()).hexdigest()
+    key = hashlib.md5(f"{cond}|{llm.model}|".encode() + Path(img_path).read_bytes()).hexdigest()
     cf = Path(cache_dir) / f"{cond}_{key}.json"
     if use_cache and cf.exists(): 
         r = json.loads(cf.read_text()); r["cached"] = True; return r
@@ -161,13 +192,13 @@ def cw_agent(llm, qid, task, step, persona, pre_desc, post_desc, images):
         fmt += ',"hypothesized_action":"the single action this persona would try at this point, in tutorial-level wording"'
     p += "Reply as JSON: " + fmt + "}"
     t0 = time.time()
-    out = parse_json(llm.ask(CW_SYS, p, images))
+    out = llm.ask_json(CW_SYS, p, images)
     out["answer"] = "yes" if str(out.get("answer", "")).lower().startswith("y") else "no"
     out["seconds"] = round(time.time() - t0, 3)
     return out
 
 # ----------------------------------------------------------------------- Orchestrator
-def run_task(llm, task, cond, run_id, args):
+def run_task(llm, llm_cw, task, cond, run_id, args):
     persona = task.get("persona") or "A first-time user with no training, who does not read documentation and explores the interface using visible cues."
     t_start = time.time(); steps_out = []
     for st in task["steps"]:
@@ -179,14 +210,14 @@ def run_task(llm, task, cond, run_id, args):
         t_perc = time.time() - t0
         pre_d, post_d = render(per_pre["components"]), render(per_post["components"])
         imgs = {"CW1": [pre], "CW2": [pre], "CW3": [pre], "CW4": [pre, post]} if args.cw_sees_image else {k: [] for k in QUESTIONS}
-        with ThreadPoolExecutor(4) as ex:   # CW1..CW4 independentes: não veem as saídas uns dos outros
-            futs = {q: ex.submit(cw_agent, llm, q, task, st, persona, pre_d, post_d, imgs[q]) for q in QUESTIONS}
+        with ThreadPoolExecutor(args.cw_parallel) as ex:   # CW1..CW4 independentes: não veem as saídas uns dos outros
+            futs = {q: ex.submit(cw_agent, llm_cw, q, task, st, persona, pre_d, post_d, imgs[q]) for q in QUESTIONS}
             cw = {q: f.result() for q, f in futs.items()}
         steps_out.append({"step_id": st["id"], "action": st["action"], "pre": st["pre"], "post": st["post"],
                           "perception_pre": per_pre, "perception_post": per_post,
                           "perception_seconds_wall": round(t_perc, 3), "cw": cw})
     return {"run_id": run_id, "task_id": task["id"], "app": task.get("app"), "condition": cond,
-            "model": llm.model if not llm.mock else "MOCK", "persona": persona, "cw_sees_image": args.cw_sees_image,
+            "model": "MOCK" if llm.mock else llm.model, "cw_model": "MOCK" if llm.mock else llm_cw.model, "provider": llm.provider, "persona": persona, "cw_sees_image": args.cw_sees_image,
             "steps": steps_out, "total_seconds": round(time.time() - t_start, 3), "report": report(steps_out)}
 
 def report(steps):
@@ -203,19 +234,30 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tasks", required=True); ap.add_argument("--out", default="runs")
     ap.add_argument("--conditions", nargs="+", default=CONDITIONS, choices=CONDITIONS)
-    ap.add_argument("--repeats", type=int, default=3); ap.add_argument("--model", default=DEFAULT_MODEL)
+    ap.add_argument("--repeats", type=int, default=3)
+    ap.add_argument("--provider", choices=["anthropic", "ollama"], default=os.environ.get("CW_PROVIDER", "anthropic"))
+    ap.add_argument("--model", default=None, help="modelo de Percepção (VLM). Padrão: claude-sonnet-5-5 | qwen3-vl:4b (ollama)")
+    ap.add_argument("--cw-model", default=None, help="modelo dos agentes CW1-4 (padrão: o mesmo de --model; pode ser um modelo de texto menor)")
+    ap.add_argument("--cw-parallel", type=int, default=None, help="agentes CW simultâneos (padrão: 4 na API, 1 no ollama)")
     ap.add_argument("--mock", action="store_true"); ap.add_argument("--yolo-weights")
     ap.add_argument("--cw-sees-image", action="store_true", help="CW1-4 também recebem a(s) tela(s) (ganho marginal da Percepção tende a diminuir; ver limitação da Seção 5.5)")
     ap.add_argument("--no-cache", action="store_true", help="refaz a Percepção a cada repetição (mede variação estocástica dela)")
     ap.add_argument("--cache", default=".perception_cache"); ap.add_argument("--workers", type=int, default=3)
     args = ap.parse_args()
     tasks = json.loads(Path(args.tasks).read_text())["tasks"]
-    llm = LLM(args.model, args.mock); Path(args.out).mkdir(exist_ok=True, parents=True)
+    if args.model is None:
+        args.model = DEFAULT_MODEL if args.provider == "anthropic" else os.environ.get("CW_MODEL", "qwen3-vl:4b")
+    if args.cw_parallel is None: args.cw_parallel = 4 if args.provider == "anthropic" else 1
+    if args.provider == "ollama" and args.workers > 1:
+        print("aviso: com Ollama local, --workers > 1 só enfileira requisições; usando 1"); args.workers = 1
+    llm = LLM(args.model, args.mock, provider=args.provider)
+    llm_cw = LLM(args.cw_model, args.mock, provider=args.provider) if args.cw_model else llm
+    Path(args.out).mkdir(exist_ok=True, parents=True)
     jobs = [(t, c, r) for c in args.conditions for t in tasks for r in range(args.repeats)]
     lock = threading.Lock()
     def job(j):
         t, c, r = j; rid = f"{c}_{t['id']}_r{r}"
-        res = run_task(llm, t, c, rid, args)
+        res = run_task(llm, llm_cw, t, c, rid, args)
         with lock, open(Path(args.out) / f"{c}.jsonl", "a") as f: f.write(json.dumps(res) + "\n")
         print(f"ok {rid} ({res['total_seconds']}s)", flush=True)
     with ThreadPoolExecutor(args.workers) as ex: list(ex.map(job, jobs))
